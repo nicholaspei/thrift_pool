@@ -140,3 +140,13 @@ func (this *Pool) WithRetry(closure func(client *Client) error) error {
 	seelog.Error(err)
 	return err
 }
+
+func (this *Pool) Close() {
+	for _, client := range this.FreeClients {
+		client.Transport.Close()
+	}
+
+	for _, client := range this.UsingClients {
+		client.Transport.Close()
+	}
+}
