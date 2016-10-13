@@ -16,6 +16,10 @@ const (
 	SLEEP_INTERVAL    = 10 * time.Millisecond
 )
 
+var (
+	ErrorLogFunc func(e error)
+)
+
 type Client struct {
 	UUID            string
 	Transport       thrift.TTransport
@@ -116,7 +120,7 @@ func (this *Pool) WithRetry(closure func(client *Client) error) error {
 	for i := 0; i < MAX_TRY_TIMES; i++ {
 		client, err := this.Get()
 		if err != nil {
-			seelog.Error(err)
+			ErrorLogFunc(err)
 			return err
 		}
 
@@ -137,7 +141,7 @@ func (this *Pool) WithRetry(closure func(client *Client) error) error {
 	}
 
 	err := errors.New("thrift pool closure run error")
-	seelog.Error(err)
+	ErrorLogFunc(err)
 	return err
 }
 
@@ -148,5 +152,11 @@ func (this *Pool) Close() {
 
 	for _, client := range this.UsingClients {
 		client.Transport.Close()
+	}
+}
+
+func init() {
+	ErrorLogFunc = func(e error) {
+		seelog.Error(e)
 	}
 }
