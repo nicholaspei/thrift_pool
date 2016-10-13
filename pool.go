@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	DEFAULT_POOL_SIZE = 8
+	DEFAULT_POOL_SIZE = 128
 	MAX_TRY_TIMES     = 3
 	MAX_WAIT_TIME     = 5 * time.Second
 	SLEEP_INTERVAL    = 10 * time.Millisecond
