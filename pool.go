@@ -117,8 +117,10 @@ func (this *Pool) Remove(client *Client) {
 }
 
 func (this *Pool) WithRetry(closure func(client *Client) error) error {
+	var err error
+	var client *Client
 	for i := 0; i < MAX_TRY_TIMES; i++ {
-		client, err := this.Get()
+		client, err = this.Get()
 		if err != nil {
 			ErrorLogFunc(err)
 			return err
@@ -140,7 +142,6 @@ func (this *Pool) WithRetry(closure func(client *Client) error) error {
 		}
 	}
 
-	err := errors.New("thrift pool closure run error")
 	ErrorLogFunc(err)
 	return err
 }
