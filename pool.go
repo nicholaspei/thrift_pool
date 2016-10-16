@@ -11,7 +11,6 @@ import (
 
 const (
 	DEFAULT_POOL_SIZE = 128
-	MAX_TRY_TIMES     = 3
 	MAX_WAIT_TIME     = 5 * time.Second
 	SLEEP_INTERVAL    = 10 * time.Millisecond
 )
@@ -119,7 +118,7 @@ func (this *Pool) Remove(client *Client) {
 func (this *Pool) WithRetry(closure func(client *Client) error) error {
 	var err error
 	var client *Client
-	for i := 0; i < MAX_TRY_TIMES; i++ {
+	for i := 0; i < DEFAULT_POOL_SIZE; i++ {
 		client, err = this.Get()
 		if err != nil {
 			ErrorLogFunc(err)
