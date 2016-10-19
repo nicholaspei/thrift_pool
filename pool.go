@@ -9,7 +9,7 @@ import (
 
 const (
 	DEFAULT_POOL_SIZE = 1024
-	PREHEAT_COUNT     = 8
+	PREHEAT_COUNT     = 128
 	MAX_WAIT_TIME     = 5 * time.Second
 )
 
@@ -77,7 +77,7 @@ func (this *Pool) Get() (*Client, error) {
 		case <-time.After(100 * time.Millisecond):
 			this.mu.Lock()
 			if this.ActiveCount()+len(this.FreeClients) < this.MaxSize {
-				this.AddClient()
+				return NewClient(this.AddrAndPort, this.NewTransportFunc)
 			}
 			this.mu.Unlock()
 		case c := <-this.FreeClients:
