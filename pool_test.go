@@ -2,6 +2,7 @@ package thrift_pool
 
 import (
 	"errors"
+	_ "fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
 	"sync"
 	"testing"
@@ -39,11 +40,11 @@ func TestWithRery_INSTABILITY(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 		return &thrift.TFramedTransport{}, thrift.NewTBinaryProtocolFactoryDefault(), nil
 	})
+	pool.SetMaxSize(32)
 
-	for i := 0; i < DEFAULT_POOL_SIZE*10; i++ {
+	for i := 0; i < pool.MaxSize; i++ {
 		err := pool.WithRetry(f)
 		if err != nil {
-			t.Log(i)
 			t.Fatal(err)
 		}
 	}
@@ -59,21 +60,18 @@ func TestWithRery_GET_CLIENT_TIME_OUT(t *testing.T) {
 		return &thrift.TFramedTransport{}, thrift.NewTBinaryProtocolFactoryDefault(), nil
 	})
 	pool.MaxWaitTime = 10 * time.Millisecond
+	pool.SetMaxSize(32)
 
-	for len(pool.FreeClients) != DEFAULT_POOL_SIZE {
+	for len(pool.FreeClients) != PREHEAT_COUNT {
 		time.Sleep(time.Millisecond)
 	}
 
 	wg := sync.WaitGroup{}
-	wg.Add(DEFAULT_POOL_SIZE)
-	for i := 0; i < DEFAULT_POOL_SIZE; i++ {
+	wg.Add(pool.MaxSize)
+	for i := 0; i < pool.MaxSize; i++ {
 		go func(count int) {
 			wg.Done()
-			err := pool.WithRetry(f)
-			if err != nil {
-				t.Fatal(count)
-				t.Fatal(err)
-			}
+			pool.Get()
 		}(i)
 	}
 	wg.Wait()
@@ -109,6 +107,7 @@ func TestWithRery_TTRANSPORTEXCEPTION(t *testing.T) {
 	pool := NewPool("1", func(addrAndPort string) (thrift.TTransport, thrift.TProtocolFactory, error) {
 		return &thrift.TFramedTransport{}, thrift.NewTBinaryProtocolFactoryDefault(), nil
 	})
+	pool.SetMaxSize(8)
 
 	err := pool.WithRetry(f)
 	if err != e {
@@ -128,9 +127,7 @@ func TestWithRery_NEW_CLIENT_TTRANSPORTEXCEPTION(t *testing.T) {
 		return &thrift.TFramedTransport{}, thrift.NewTBinaryProtocolFactoryDefault(), e
 	})
 
-	for len(pool.FreeClients) != DEFAULT_POOL_SIZE {
-		time.Sleep(time.Millisecond)
-	}
+	pool.AddClient()
 }
 
 func BenchmarkWithRetry(b *testing.B) {
