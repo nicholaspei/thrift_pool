@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	DEFAULT_POOL_SIZE = 1024
-	PREHEAT_COUNT     = 128
+	DEFAULT_POOL_SIZE = 128
+	PREHEAT_COUNT     = 64
 	MAX_WAIT_TIME     = 5 * time.Second
 	MAX_TRY           = 5
 )
