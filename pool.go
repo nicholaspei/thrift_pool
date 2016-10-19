@@ -1,18 +1,14 @@
 package thrift_pool
 
 import (
-	"errors"
 	"git.apache.org/thrift.git/lib/go/thrift"
 	"github.com/cihub/seelog"
-	"github.com/satori/go.uuid"
-	"sync"
 	"time"
 )
 
 const (
-	DEFAULT_POOL_SIZE = 32
+	DEFAULT_POOL_SIZE = 256
 	MAX_WAIT_TIME     = 5 * time.Second
-	SLEEP_INTERVAL    = 10 * time.Millisecond
 )
 
 var (
@@ -20,99 +16,56 @@ var (
 )
 
 type Client struct {
-	UUID            string
 	Transport       thrift.TTransport
 	ProtocolFactory thrift.TProtocolFactory
 }
 
 type Pool struct {
-	Lock         *sync.Mutex
-	Size         int
-	WaitTimeOut  time.Duration
-	AddrAndPort  string
-	Block        func(addrAndPort string) (*Client, error)
-	FreeClients  map[string]*Client
-	UsingClients map[string]*Client
+	AddrAndPort      string
+	FreeClients      chan *Client
+	NewTransportFunc func(addrAndPort string) (t thrift.TTransport, p thrift.TProtocolFactory, err error)
+	MaxWaitTime      time.Duration
 }
 
 func NewPool(addrAndPort string, f func(addrAndPort string) (t thrift.TTransport, p thrift.TProtocolFactory, err error)) *Pool {
-	block := func(addrAndPort string) (*Client, error) {
-		t, p, err := f(addrAndPort)
-		u := uuid.NewV4().String()
-		client := &Client{UUID: u, Transport: t, ProtocolFactory: p}
-		return client, err
-	}
-	return &Pool{AddrAndPort: addrAndPort, Block: block, FreeClients: map[string]*Client{}, UsingClients: map[string]*Client{}, Size: DEFAULT_POOL_SIZE, Lock: &sync.Mutex{}, WaitTimeOut: MAX_WAIT_TIME}
-}
-
-func (this *Pool) SetSize(size int) {
-	this.Size = size
-}
-
-func (this *Pool) SetWaitTimeOut(t time.Duration) {
-	this.WaitTimeOut = t
-}
-
-func (this *Pool) Get() (client *Client, err error) {
-	if len(this.FreeClients)+len(this.UsingClients) < this.Size {
-		client, err = this.Block(this.AddrAndPort)
-		if err == nil {
-			this.MutexAddUsingClients(client)
-		}
-		return
+	this := &Pool{
+		AddrAndPort:      addrAndPort,
+		FreeClients:      make(chan *Client, DEFAULT_POOL_SIZE),
+		NewTransportFunc: f,
+		MaxWaitTime:      MAX_WAIT_TIME,
 	}
 
-	sleepedTime := 0 * time.Millisecond
-	for {
-		if len(this.FreeClients) > 0 {
-			break
-		}
-		time.Sleep(SLEEP_INTERVAL)
-		sleepedTime += SLEEP_INTERVAL
-		if sleepedTime > this.WaitTimeOut {
-			err = TimeOut{"timeout to get a client"}
-			return
-		}
+	for i := 0; i < DEFAULT_POOL_SIZE; i++ {
+		go this.AddClient()
 	}
-	client, err = this.MutexMoveFreeToUsing()
-	return
+	return this
 }
 
-func (this *Pool) MutexAddUsingClients(client *Client) {
-	this.Lock.Lock()
-	defer this.Lock.Unlock()
-	this.UsingClients[client.UUID] = client
+func NewClient(addrAndPort string, f func(addrAndPort string) (t thrift.TTransport, p thrift.TProtocolFactory, err error)) (*Client, error) {
+	t, p, err := f(addrAndPort)
+	client := &Client{Transport: t, ProtocolFactory: p}
+	return client, err
 }
 
-func (this *Pool) MutexMoveFreeToUsing() (client *Client, err error) {
-	this.Lock.Lock()
-	defer this.Lock.Unlock()
-	for _, v := range this.FreeClients {
-		client = v
-		break
+func (this *Pool) AddClient() {
+	client, err := NewClient(this.AddrAndPort, this.NewTransportFunc)
+	if err != nil {
+		ErrorLogFunc(err)
 	}
+	this.FreeClients <- client
+}
 
-	if client == nil {
-		return nil, errors.New("can not get client")
+func (this *Pool) Get() (*Client, error) {
+	select {
+	case <-time.After(this.MaxWaitTime):
+		return nil, TimeOut{"timeout to get a client"}
+	case c := <-this.FreeClients:
+		return c, nil
 	}
-
-	delete(this.FreeClients, client.UUID)
-	this.UsingClients[client.UUID] = client
-	return
 }
 
-func (this *Pool) PutBack(client *Client) {
-	this.Lock.Lock()
-	defer this.Lock.Unlock()
-	delete(this.UsingClients, client.UUID)
-	this.FreeClients[client.UUID] = client
-}
-
-func (this *Pool) Remove(client *Client) {
-	this.Lock.Lock()
-	defer this.Lock.Unlock()
-	delete(this.UsingClients, client.UUID)
-	delete(this.FreeClients, client.UUID)
+func (this *Pool) PutBack(c *Client) {
+	this.FreeClients <- c
 }
 
 func (this *Pool) WithRetry(closure func(client *Client) error) error {
@@ -131,7 +84,7 @@ func (this *Pool) WithRetry(closure func(client *Client) error) error {
 			this.PutBack(client)
 			return nil
 		} else {
-			this.Remove(client)
+			go this.AddClient()
 			_, ok := err.(thrift.TTransportException)
 			if ok {
 				continue
@@ -143,16 +96,6 @@ func (this *Pool) WithRetry(closure func(client *Client) error) error {
 
 	ErrorLogFunc(err)
 	return err
-}
-
-func (this *Pool) Close() {
-	for _, client := range this.FreeClients {
-		client.Transport.Close()
-	}
-
-	for _, client := range this.UsingClients {
-		client.Transport.Close()
-	}
 }
 
 func init() {
