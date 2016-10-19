@@ -11,6 +11,7 @@ const (
 	DEFAULT_POOL_SIZE = 1024
 	PREHEAT_COUNT     = 128
 	MAX_WAIT_TIME     = 5 * time.Second
+	MAX_TRY           = 5
 )
 
 var (
@@ -20,6 +21,7 @@ var (
 type Client struct {
 	Transport       thrift.TTransport
 	ProtocolFactory thrift.TProtocolFactory
+	Alive           bool
 }
 
 type Pool struct {
@@ -53,7 +55,7 @@ func NewPool(addrAndPort string, f func(addrAndPort string) (t thrift.TTransport
 
 func NewClient(addrAndPort string, f func(addrAndPort string) (t thrift.TTransport, p thrift.TProtocolFactory, err error)) (*Client, error) {
 	t, p, err := f(addrAndPort)
-	client := &Client{Transport: t, ProtocolFactory: p}
+	client := &Client{Transport: t, ProtocolFactory: p, Alive: true}
 	return client, err
 }
 
@@ -99,7 +101,7 @@ func (this *Pool) Remove(c *Client) {
 func (this *Pool) WithRetry(closure func(client *Client) error) error {
 	var err error
 	var client *Client
-	for i := 0; i < this.MaxSize+1; i++ {
+	for i := 0; i < MAX_TRY; i++ {
 		client, err = this.Get()
 		if err != nil {
 			ErrorLogFunc(err)
@@ -109,15 +111,15 @@ func (this *Pool) WithRetry(closure func(client *Client) error) error {
 		err = closure(client)
 
 		if err == nil {
-			go this.PutBack(client)
+			this.PutBack(client)
 			return nil
 		} else {
 			_, ok := err.(thrift.TTransportException)
 			if ok {
-				go this.Remove(client)
+				this.Remove(client)
 				continue
 			} else {
-				go this.PutBack(client)
+				this.PutBack(client)
 				return err
 			}
 		}
