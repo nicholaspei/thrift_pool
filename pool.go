@@ -9,7 +9,6 @@ import (
 
 const (
 	DEFAULT_POOL_SIZE = 128
-	PREHEAT_COUNT     = 64
 	MAX_WAIT_TIME     = 5 * time.Second
 	MAX_TRY           = 5
 )
@@ -47,9 +46,6 @@ func NewPool(addrAndPort string, f func(addrAndPort string) (t thrift.TTransport
 		MaxSize:          DEFAULT_POOL_SIZE,
 	}
 
-	for i := 0; i < PREHEAT_COUNT; i++ {
-		go this.AddClient()
-	}
 	return this
 }
 
@@ -63,30 +59,23 @@ func (this *Pool) SetMaxSize(i int) {
 	this.MaxSize = i
 }
 
-func (this *Pool) AddClient() {
-	client, err := NewClient(this.AddrAndPort, this.NewTransportFunc)
-	if err != nil {
-		ErrorLogFunc(err)
-		return
-	}
-	this.FreeClients <- client
-}
-
 func (this *Pool) Get() (*Client, error) {
-	defer this.ActiveCountPlus(1)
-	for i := 0 * time.Second; i < this.MaxWaitTime; i += 100 * time.Millisecond {
-		select {
-		case <-time.After(100 * time.Millisecond):
-			this.mu.Lock()
-			if this.ActiveCount()+len(this.FreeClients) < this.MaxSize {
-				return NewClient(this.AddrAndPort, this.NewTransportFunc)
-			}
-			this.mu.Unlock()
-		case c := <-this.FreeClients:
-			return c, nil
-		}
+	this.mu.Lock()
+	if this.ActiveCount()+len(this.FreeClients) < this.MaxSize {
+		defer this.mu.Unlock()
+		defer this.ActiveCountPlus(1)
+		return NewClient(this.AddrAndPort, this.NewTransportFunc)
+	} else {
+		this.mu.Unlock()
+		defer this.ActiveCountPlus(1)
 	}
-	return nil, TimeOut{"time out to get client"}
+
+	select {
+	case <-time.After(this.MaxWaitTime):
+		return nil, TimeOut{"time out to get client"}
+	case c := <-this.FreeClients:
+		return c, nil
+	}
 }
 
 func (this *Pool) PutBack(c *Client) {

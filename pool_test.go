@@ -36,7 +36,6 @@ func TestWithRery_INSTABILITY(t *testing.T) {
 	}
 
 	pool := NewPool("1", func(addrAndPort string) (thrift.TTransport, thrift.TProtocolFactory, error) {
-		time.Sleep(100 * time.Millisecond)
 		return &thrift.TFramedTransport{}, thrift.NewTBinaryProtocolFactoryDefault(), nil
 	})
 	pool.SetMaxSize(32)
@@ -55,10 +54,6 @@ func TestWithRery_GET_CLIENT_TIME_OUT(t *testing.T) {
 	})
 	pool.MaxWaitTime = 10 * time.Millisecond
 	pool.SetMaxSize(32)
-
-	for len(pool.FreeClients) != PREHEAT_COUNT {
-		time.Sleep(time.Millisecond)
-	}
 
 	for i := len(pool.FreeClients); i < pool.MaxSize; i++ {
 		pool.Get()
@@ -115,7 +110,7 @@ func TestWithRery_NEW_CLIENT_TTRANSPORTEXCEPTION(t *testing.T) {
 		return &thrift.TFramedTransport{}, thrift.NewTBinaryProtocolFactoryDefault(), e
 	})
 
-	pool.AddClient()
+	pool.Get()
 }
 
 func TestWithRery_CLIENT_RESTART(t *testing.T) {
