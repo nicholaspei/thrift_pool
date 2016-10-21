@@ -60,14 +60,13 @@ func (this *Pool) SetMaxSize(i int) {
 }
 
 func (this *Pool) Get() (*Client, error) {
+	defer this.ActiveCountPlus(1)
 	this.mu.Lock()
 	if this.ActiveCount()+len(this.FreeClients) < this.MaxSize {
 		defer this.mu.Unlock()
-		defer this.ActiveCountPlus(1)
 		return NewClient(this.AddrAndPort, this.NewTransportFunc)
 	} else {
 		this.mu.Unlock()
-		defer this.ActiveCountPlus(1)
 	}
 
 	select {
