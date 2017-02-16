@@ -84,6 +84,7 @@ func (this *Pool) PutBack(c *Client) {
 
 func (this *Pool) Remove(c *Client) {
 	defer this.ActiveCountPlus(-1)
+	c.Transport.Close()
 }
 
 func (this *Pool) WithRetry(closure func(client *Client) error) error {
