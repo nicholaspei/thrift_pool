@@ -37,7 +37,7 @@ type Pool struct {
 func NewPool(addrAndPort string, f func(addrAndPort string) (t thrift.TTransport, p thrift.TProtocolFactory, err error)) *Pool {
 	this := &Pool{
 		AddrAndPort:      addrAndPort,
-		FreeClients:      make(chan *Client, DEFAULT_POOL_SIZE*2),
+		FreeClients:      make(chan *Client, DEFAULT_POOL_SIZE),
 		NewTransportFunc: f,
 		MaxWaitTime:      MAX_WAIT_TIME,
 		activeCount:      0,
@@ -57,6 +57,7 @@ func NewClient(addrAndPort string, f func(addrAndPort string) (t thrift.TTranspo
 
 func (this *Pool) SetMaxSize(i int) {
 	this.MaxSize = i
+	this.FreeClients = make(chan *Client, i)
 }
 
 func (this *Pool) Get() (*Client, error) {
