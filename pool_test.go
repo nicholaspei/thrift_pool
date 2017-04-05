@@ -15,7 +15,7 @@ func TestWithRery_OK(t *testing.T) {
 	}
 
 	pool := NewPool("1", func(addrAndPort string) (thrift.TTransport, thrift.TProtocolFactory, error) {
-		return &thrift.TFramedTransport{}, thrift.NewTBinaryProtocolFactoryDefault(), nil
+		return thrift.NewTFramedTransport(thrift.NewTMemoryBuffer()), thrift.NewTBinaryProtocolFactoryDefault(), nil
 	})
 
 	err := pool.WithRetry(f)
@@ -36,7 +36,7 @@ func TestWithRery_INSTABILITY(t *testing.T) {
 	}
 
 	pool := NewPool("1", func(addrAndPort string) (thrift.TTransport, thrift.TProtocolFactory, error) {
-		return &thrift.TFramedTransport{}, thrift.NewTBinaryProtocolFactoryDefault(), nil
+		return thrift.NewTFramedTransport(thrift.NewTMemoryBuffer()), thrift.NewTBinaryProtocolFactoryDefault(), nil
 	})
 	pool.SetMaxSize(32)
 
@@ -50,7 +50,7 @@ func TestWithRery_INSTABILITY(t *testing.T) {
 
 func TestWithRery_GET_CLIENT_TIME_OUT(t *testing.T) {
 	pool := NewPool("1", func(addrAndPort string) (thrift.TTransport, thrift.TProtocolFactory, error) {
-		return &thrift.TFramedTransport{}, thrift.NewTBinaryProtocolFactoryDefault(), nil
+		return thrift.NewTFramedTransport(thrift.NewTMemoryBuffer()), thrift.NewTBinaryProtocolFactoryDefault(), nil
 	})
 	pool.MaxWaitTime = 10 * time.Millisecond
 	pool.SetMaxSize(32)
@@ -72,7 +72,7 @@ func TestWithRery_ERROR(t *testing.T) {
 	}
 
 	pool := NewPool("1", func(addrAndPort string) (thrift.TTransport, thrift.TProtocolFactory, error) {
-		return &thrift.TFramedTransport{}, thrift.NewTBinaryProtocolFactoryDefault(), nil
+		return thrift.NewTFramedTransport(thrift.NewTMemoryBuffer()), thrift.NewTBinaryProtocolFactoryDefault(), nil
 	})
 
 	err := pool.WithRetry(f)
@@ -88,7 +88,7 @@ func TestWithRery_TTRANSPORTEXCEPTION(t *testing.T) {
 	}
 
 	pool := NewPool("1", func(addrAndPort string) (thrift.TTransport, thrift.TProtocolFactory, error) {
-		return &thrift.TFramedTransport{}, thrift.NewTBinaryProtocolFactoryDefault(), nil
+		return thrift.NewTFramedTransport(thrift.NewTMemoryBuffer()), thrift.NewTBinaryProtocolFactoryDefault(), nil
 	})
 	pool.SetMaxSize(8)
 
@@ -107,7 +107,7 @@ func TestWithRery_NEW_CLIENT_TTRANSPORTEXCEPTION(t *testing.T) {
 	}
 
 	pool := NewPool("1", func(addrAndPort string) (thrift.TTransport, thrift.TProtocolFactory, error) {
-		return &thrift.TFramedTransport{}, thrift.NewTBinaryProtocolFactoryDefault(), e
+		return thrift.NewTFramedTransport(thrift.NewTMemoryBuffer()), thrift.NewTBinaryProtocolFactoryDefault(), nil
 	})
 
 	pool.Get()
@@ -119,7 +119,7 @@ func TestWithRery_CLIENT_RESTART(t *testing.T) {
 		return nil
 	}
 	pool := NewPool("1", func(addrAndPort string) (thrift.TTransport, thrift.TProtocolFactory, error) {
-		return &thrift.TFramedTransport{}, thrift.NewTBinaryProtocolFactoryDefault(), nil
+		return thrift.NewTFramedTransport(thrift.NewTMemoryBuffer()), thrift.NewTBinaryProtocolFactoryDefault(), nil
 	})
 	pool.SetMaxSize(100)
 	for i := 0; i < 100; i++ {
@@ -147,7 +147,7 @@ func BenchmarkWithRetry(b *testing.B) {
 
 	pool := NewPool("1", func(addrAndPort string) (thrift.TTransport, thrift.TProtocolFactory, error) {
 		time.Sleep(200 * time.Millisecond)
-		return &thrift.TFramedTransport{}, thrift.NewTBinaryProtocolFactoryDefault(), nil
+		return thrift.NewTFramedTransport(thrift.NewTMemoryBuffer()), thrift.NewTBinaryProtocolFactoryDefault(), nil
 	})
 
 	wg := sync.WaitGroup{}
