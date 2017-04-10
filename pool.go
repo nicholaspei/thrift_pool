@@ -107,6 +107,7 @@ func (this *Pool) WithRetry(closure func(client *Client) error) error {
 			_, ok := err.(thrift.TTransportException)
 			if ok {
 				this.Remove(client)
+				time.Sleep(100 * time.Millisecond)
 				continue
 			} else {
 				this.PutBack(client)
