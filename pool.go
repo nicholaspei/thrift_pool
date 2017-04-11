@@ -105,9 +105,11 @@ func (this *Pool) WithRetry(closure func(client *Client) error) error {
 			if err != nil {
 				return err
 			} else {
-				client.Transport.Close()
+
 			}
-			return closure(client)
+			err = closure(client)
+			client.Transport.Close()
+			return err
 		} else {
 			this.PutBack(client)
 			return err
