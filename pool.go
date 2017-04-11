@@ -10,7 +10,6 @@ import (
 const (
 	DEFAULT_POOL_SIZE = 128
 	MAX_WAIT_TIME     = 5 * time.Second
-	MAX_TRY           = 5
 )
 
 var (
@@ -89,35 +88,32 @@ func (this *Pool) Remove(c *Client) {
 }
 
 func (this *Pool) WithRetry(closure func(client *Client) error) error {
-	var err error
-	var client *Client
-	for i := 0; i < MAX_TRY; i++ {
-		client, err = this.Get()
-		if err != nil {
-			ErrorLogFunc(err)
-			return err
-		}
-
-		err = closure(client)
-
-		if err == nil {
-			this.PutBack(client)
-			return nil
-		} else {
-			_, ok := err.(thrift.TTransportException)
-			if ok {
-				this.Remove(client)
-				time.Sleep(100 * time.Millisecond)
-				continue
-			} else {
-				this.PutBack(client)
-				return err
-			}
-		}
+	client, err := this.Get()
+	if err != nil {
+		return err
 	}
 
-	ErrorLogFunc(err)
-	return err
+	err = closure(client)
+	if err == nil {
+		this.PutBack(client)
+		return nil
+	} else {
+		_, ok := err.(thrift.TTransportException)
+		if ok {
+			this.Remove(client)
+			client, err = this.Get()
+			if err != nil {
+				return err
+			} else {
+				client.Transport.Close()
+			}
+			return closure(client)
+		} else {
+			this.PutBack(client)
+			return err
+		}
+	}
+	return nil
 }
 
 func (this *Pool) ActiveCount() int {
