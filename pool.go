@@ -101,12 +101,12 @@ func (this *Pool) WithRetry(closure func(client *Client) error) error {
 		_, ok := err.(thrift.TTransportException)
 		if ok {
 			this.Remove(client)
-			for i := 0; i < 3; i++ {
+			for i := 0; i < 5; i++ {
 				client, err = NewClient(this.AddrAndPort, this.NewTransportFunc)
 				if err == nil {
 					break
 				}
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep((100 + i*20) * time.Millisecond)
 			}
 			if err != nil {
 				return err
